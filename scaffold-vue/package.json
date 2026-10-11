@@ -1,6 +1,6 @@
 {
   "name": "scaffold-vue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "通用后台管理脚手架前端（Vue 3 + Vite + TS，珍珠玻璃主题）",
   "type": "module",
@@ -9,7 +9,9 @@
     "test:api": "node --test --experimental-strip-types src/api/__tests__/*.test.ts",
     "test:unit": "node --test --experimental-strip-types src/api/__tests__/*.test.ts src/utils/__tests__/*.test.ts",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src",
+    "test": "npm run test:unit"
   },
   "dependencies": {
     "gsap": "^3.15.0",
@@ -17,10 +19,16 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@typescript-eslint/parser": "^8.71.1",
     "@vitejs/plugin-vue": "^5.2.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-vue": "^10.11.1",
     "typescript": "~5.7.2",
     "vite": "^6.0.7",
     "vue-tsc": "^2.2.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": "^22.13.0 || >=24"
+  }
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { pathOf } from '@/composables/auth'
-import { Avatar, Field, HoverCard, Segmented, Select, StatusTag, Switch, Tag, TextInput, type Column } from '@/components/ui'
+import { Avatar, Field, HoverCard, MultiSelect, Segmented, Select, StatusTag, Switch, Tag, TextInput, type Column } from '@/components/ui'
 import { DeptSelect, DeptTree, DictSelect, FormDialog, ListPage, PermissionButton } from '@/components/business'
 import BoardView, { type BoardColumn } from '@/components/business/BoardView.vue'
 import { systemApi, type UserRow } from '@/api'
@@ -11,7 +11,6 @@ import { useViewMode } from '@/composables/view'
 import { hasPermission } from '@/directives/permission'
 import { confirm } from '@/composables/confirm'
 import { pushToast, toastError } from '@/composables/toast'
-import { flattenDepts } from '@/composables/dept'
 import type { Dept } from '@/data'
 import { email, phone, required, validate } from '@/utils/validate'
 
@@ -141,13 +140,13 @@ interface UserForm {
   phone: string
   email: string
   deptId: number | null
-  roleId: number | null
-  postId: number | null
+  roleIds: number[]
+  postIds: number[]
   status: number
 }
 const emptyForm = (): UserForm => ({
   username: '', nickname: '', password: initPassword.value, phone: '', email: '',
-  deptId: list.query.deptId, roleId: null, postId: null, status: 1,
+  deptId: list.query.deptId, roleIds: [], postIds: [], status: 1,
 })
 const dialog = ref(false)
 const saving = ref(false)
@@ -167,7 +166,6 @@ function openCreate() {
 }
 
 function openEdit(row: UserRow) {
-  const dept = flattenDepts(departments.value).find(d => d.dept.name === row.deptName)
   Object.assign(form, {
     id: row.id,
     username: row.username,
@@ -175,9 +173,9 @@ function openEdit(row: UserRow) {
     password: '',
     phone: row.phone ?? '',
     email: row.email ?? '',
-    deptId: dept?.dept.id ?? null,
-    roleId: roles.value.find(r => r.name === row.roleName)?.id ?? null,
-    postId: posts.value.find(p => p.name === row.postName)?.id ?? null,
+    deptId: row.deptId,
+    roleIds: [...row.roleIds],
+    postIds: [...row.postIds],
     status: row.status,
   })
   errors.value = {}
@@ -192,7 +190,7 @@ async function submit() {
     phone: [phone],
     email: [email],
     deptId: [required('请选择所属部门')],
-    roleId: [required('请选择角色')],
+    roleIds: [v => (Array.isArray(v) && v.length ? undefined : '请选择角色')],
   })
   if (Object.keys(errors.value).length) return
   saving.value = true
@@ -203,8 +201,8 @@ async function submit() {
     email: form.email || undefined,
     deptId: form.deptId ?? undefined,
     status: form.status,
-    roleIds: form.roleId ? [form.roleId] : [],
-    postIds: form.postId ? [form.postId] : [],
+    roleIds: [...form.roleIds],
+    postIds: [...form.postIds],
   }
   try {
     if (form.id) {
@@ -423,7 +421,7 @@ async function batchRemove(ids: (string | number)[]) {
       <Field label="用户姓名" required :error="errors.nickname">
         <TextInput v-model="form.nickname" placeholder="真实姓名" :invalid="!!errors.nickname" />
       </Field>
-      <Field v-if="!isEdit" label="初始密码" required :error="errors.password" hint="默认取自系统参数中的用户初始密码" span>
+      <Field v-if="!isEdit" label="初始密码" required :error="errors.password" hint="请明确设置初始密码，长度为6到64位" span>
         <TextInput v-model="form.password" placeholder="至少 6 位" :invalid="!!errors.password" autocomplete="new-password" />
       </Field>
       <Field label="手机号码" :error="errors.phone">
@@ -435,11 +433,11 @@ async function batchRemove(ids: (string | number)[]) {
       <Field label="所属部门" required :error="errors.deptId">
         <DeptSelect v-model="form.deptId" :data="departments" :invalid="!!errors.deptId" />
       </Field>
-      <Field label="岗位">
-        <Select v-model="form.postId" :options="postOptions" placeholder="选填" clearable />
+      <Field label="岗位" group>
+        <MultiSelect v-model="form.postIds" :options="postOptions" />
       </Field>
-      <Field label="角色" required :error="errors.roleId">
-        <Select v-model="form.roleId" :options="roleOptions" :invalid="!!errors.roleId" />
+      <Field label="角色" required :error="errors.roleIds" group>
+        <MultiSelect v-model="form.roleIds" :options="roleOptions" :invalid="!!errors.roleIds" />
       </Field>
       <Field label="账号状态" group>
         <Switch :model-value="form.status === 1" :label="form.status === 1 ? '正常，允许登录' : '停用，禁止登录'" @update:model-value="form.status = $event ? 1 : 0" />

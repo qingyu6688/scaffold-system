@@ -14,7 +14,7 @@ import java.util.List;
 public interface AuthMapper {
 
     @Select("""
-            SELECT u.id, u.username, u.password, u.nickname, u.status, u.dept_id, d.dept_name
+            SELECT u.id, u.username, u.password, u.session_version, u.nickname, u.status, u.dept_id, d.dept_name
             FROM sys_user u
             LEFT JOIN sys_dept d ON d.id = u.dept_id
             WHERE u.username = #{username} AND u.deleted = 0
@@ -90,8 +90,8 @@ public interface AuthMapper {
 
     @Update("""
             UPDATE sys_user
-            SET password = #{password}, update_by = #{username}, update_time = NOW()
-            WHERE id = #{userId} AND deleted = 0
+            SET session_version = session_version + 1, password = #{password}, update_by = #{username}, update_time = NOW()
+            WHERE id = #{userId} AND deleted = 0 AND password = #{oldPassword}
             """)
-    int updatePassword(@Param("userId") Long userId, @Param("username") String username, @Param("password") String password);
+    int updatePassword(@Param("userId") Long userId, @Param("username") String username, @Param("password") String password, @Param("oldPassword") String oldPassword);
 }

@@ -1,6 +1,7 @@
 package com.scaffold.admin;
 
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -19,8 +20,8 @@ final class TestAuthClient {
     private TestAuthClient() {
     }
 
-    static String login(TestRestTemplate restTemplate, String username, String password) {
-        ResponseEntity<Map<String, Object>> response = loginResponse(restTemplate, username, password);
+    static String login(TestRestTemplate restTemplate, StringRedisTemplate redisTemplate, String username, String password) {
+        ResponseEntity<Map<String, Object>> response = loginResponse(restTemplate, redisTemplate, username, password);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         Map<String, Object> data = dataOf(response.getBody());
@@ -28,7 +29,7 @@ final class TestAuthClient {
         return (String) data.get("token");
     }
 
-    static ResponseEntity<Map<String, Object>> loginResponse(TestRestTemplate restTemplate, String username, String password) {
+    static ResponseEntity<Map<String, Object>> loginResponse(TestRestTemplate restTemplate, StringRedisTemplate redisTemplate, String username, String password) {
         Map<String, Object> captcha = dataOf(restTemplate.exchange(
                 "/api/auth/captcha",
                 HttpMethod.GET,
@@ -42,7 +43,7 @@ final class TestAuthClient {
                 new HttpEntity<>(Map.of(
                         "username", username,
                         "password", password,
-                        "captcha", captcha.get("code"),
+                        "captcha", redisTemplate.opsForValue().get("captcha:" + captcha.get("uuid")),
                         "captchaUuid", captcha.get("uuid")
                 )),
                 MAP_TYPE

@@ -5,7 +5,7 @@ export const APP = Object.freeze({
   name: '通用后台管理系统',
   shortName: '管理后台',
   subtitle: 'Admin Console',
-  version: 'v1.0.0',
+  version: 'v1.0.1',
   copyright: `© ${new Date().getFullYear()} 通用后台管理系统`,
 })
 

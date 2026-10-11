@@ -9,7 +9,7 @@ export interface LoginRequest {
 
 export interface CaptchaResponse {
   uuid: string
-  code: string
+  image: string
 }
 
 export interface LoginResponse {

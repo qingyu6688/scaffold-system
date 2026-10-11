@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +29,9 @@ class SystemWriteApiTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Test
     void backendPermissionAnnotationRejectsUserWithoutPermission() {
@@ -230,7 +234,7 @@ class SystemWriteApiTest {
         );
         assertThat(disable.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        ResponseEntity<Map<String, Object>> disabledLogin = TestAuthClient.loginResponse(restTemplate, "it_user_ext_" + suffix, "admin123");
+        ResponseEntity<Map<String, Object>> disabledLogin = TestAuthClient.loginResponse(restTemplate, redisTemplate, "it_user_ext_" + suffix, "admin123");
         assertThat(disabledLogin.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(disabledLogin.getBody()).containsEntry("message", "账号已停用");
 
@@ -294,7 +298,7 @@ class SystemWriteApiTest {
     }
 
     private String login(String username, String password) {
-        return TestAuthClient.login(restTemplate, username, password);
+        return TestAuthClient.login(restTemplate, redisTemplate, username, password);
     }
 
     private HttpHeaders bearerHeaders(String token) {

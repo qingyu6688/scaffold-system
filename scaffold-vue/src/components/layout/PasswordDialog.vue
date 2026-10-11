@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { clearSession } from '@/composables/auth'
 import FormDialog from '@/components/business/FormDialog.vue'
 import Field from '@/components/ui/Field.vue'
 import TextInput from '@/components/ui/TextInput.vue'
@@ -10,6 +12,7 @@ import { required, validate } from '@/utils/validate'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
+const router = useRouter()
 const form = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const errors = ref<Partial<Record<keyof typeof form, string>>>({})
 const saving = ref(false)
@@ -30,7 +33,9 @@ async function submit() {
   saving.value = true
   try {
     await authApi.changePassword({ oldPassword: form.oldPassword, newPassword: form.newPassword })
-    pushToast('密码已修改，下次登录请使用新密码', 'ok')
+    clearSession()
+    pushToast('密码已修改，请使用新密码重新登录', 'ok')
+    await router.replace('/login')
     emit('close')
   } catch (error) {
     toastError(error, '密码修改失败')

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +27,9 @@ class MonitorStatsApiTest {
     private static final String PROBE_IP = "10.250." + (System.nanoTime() % 200) + ".7";
     private static final String PROBE_USER = "probe_" + System.nanoTime();
     @Autowired private TestRestTemplate restTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PasswordEncoder encoder;
     private Long userId;
@@ -139,7 +143,7 @@ class MonitorStatsApiTest {
         return name;
     }
 
-    private String login(String username) { return TestAuthClient.login(restTemplate, username, "admin123"); }
+    private String login(String username) { return TestAuthClient.login(restTemplate, redisTemplate, username, "admin123"); }
     private HttpHeaders headers(String token) {
         HttpHeaders headers = new HttpHeaders(); headers.setBearerAuth(token); return headers;
     }

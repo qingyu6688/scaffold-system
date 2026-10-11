@@ -1,6 +1,6 @@
 # 通用后台管理脚手架项目地图
 
-> 2026-10-11 更新。用于后续业务开发和排障；“已确认”表示代码链路已核对，运行验证记录见 `changelog.md`。数据库映射已与本地 MySQL 5.7 的真实结构及两份初始化脚本核对。
+> 2026-10-12 更新。用于后续业务开发和排障；“已确认”表示代码链路已核对，运行验证记录见 `changelog.md`。原映射已与本地 MySQL 5.7 和 V1/V2 核对；本次新增 V3，并在独立 MySQL 8.0、Redis 实例中验证，详见 `docs/测试报告.md`。
 
 ## 一、项目总览
 
@@ -12,7 +12,8 @@
 - Maven 模块：`scaffold-common`、`scaffold-framework`、`scaffold-system`、`scaffold-generator`、`scaffold-admin`。
 - 包名前缀：`com.scaffold`；启动类：`scaffold-system/scaffold-admin/src/main/java/com/scaffold/admin/ScaffoldAdminApplication.java`。
 - 配置：`scaffold-system/scaffold-admin/src/main/resources/application.yml`、`application-dev.yml`；前端代理：`scaffold-vue/vite.config.ts`。
-- 数据库初始化：`scaffold-system/sql/V1__init_schema.sql`、`V2__seed_data.sql`；开发工具：`scaffold-admin/src/main/java/com/scaffold/admin/util/DbInit.java`。
+- 数据库初始化：`scaffold-system/sql/V1__init_schema.sql`、`V2__seed_data.sql`、`V3__user_session_version.sql`；开发工具：`scaffold-admin/src/main/java/com/scaffold/admin/util/DbInit.java`。
+- 本机启动：`scaffold-system/Start-Local.ps1` → 读取同目录 `.env` → 启动当前版本 Jar；Redis 逻辑库通过 `REDIS_DATABASE` 配置，默认0。本机接入记录见 `docs/本地数据库接入说明.md`。
 - 入口规范：`README.md`、`AGENTS.md`、`DESIGN.md`；建筑与工作流已移除。
 
 ## 二、业务术语词典
@@ -158,7 +159,7 @@
 
 - Redis token key 前缀为 `auth:token:`；退出删除当前 token，每次登录的 JWT 带独立 ID。
 - JWT 签名密钥读取必填环境变量 `JWT_SECRET`，UTF-8 编码至少 32 字节且不能全为空白；缺失或长度不足时阻止启动。
-- 验证码保存在 Redis、验证时消费；当前开发底座接口返回四位字符供页面显示。
+- 验证码保存在 Redis，以 GETDEL 原子消费；接口仅返回 PNG 图片及随机标识，由 LoginGuard 限制匿名接口频率和账号失败次数。
 - `session.ts` 统一管理 localStorage / sessionStorage；会话清理两处都清，外观设置独立保留。
 - `sessionVersion` 阻止旧菜单 / 用户请求写回；旧 token 的 401 不能清除新账号会话。
 - 字典、部门缓存随账号切换清除；列表以请求序号避免晚到结果覆盖新查询。
@@ -183,3 +184,14 @@
 | 新业务数据权限 | 当前接入用户列表与导出，其他新增业务不会自动具备数据范围 | 按业务表的部门 / 创建人字段接入公共能力 |
 | 文件业务与防重复提交 | 文件表已保留，统一上传及防重复提交能力未提供完整业务闭环 | 有实际需求时扩展公共能力 |
 | 历史能力边界 | 早期版本包含当前已删除的建筑与工作流模块 | 历史变更见 `changelog.md`，当前范围查本地图与 README |
+
+
+## 2026-10-12 安全修复定位
+
+- 用户写入边界：`UserAccessPolicy` → `SystemDataScopeResolver` / `AuthMapper` → `SystemManagementMapper.selectUserForUpdate`，在事务内校验并写入。
+- 有效权限：`SystemPermissionResolver.effectivePermissions` 与 `AuthService.currentUser` 共同限制角色、菜单、部门结构写权限。
+- 会话失效：`sys_user.session_version` → `TokenStore.Session` → `JwtAuthenticationFilter` → `SystemSessionAccountResolver`，每次认证检查账号及版本。
+- 部门移动：`SystemManagementService.updateDept` → `lockDeptTree` → `DepartmentPaths.move` → `updateDeptAncestors`，当前节点和后代同一事务更新。
+- 用户多选：`Users.vue` / `MultiSelect.vue`，列表明确返回部门、角色和岗位编号；关联按两次批量查询补全。
+- 回归入口：`SecurityRegressionApiTest`、`DepartmentPathsTest`、`UserPostPolicyTest`、`ExportSafetyTest`、`LoginGuardTest`、`scripts/session-regression.py`。
+- 升级与验证：`docs/安全修复说明.md`、`docs/环境说明.md`、`docs/测试报告.md`。

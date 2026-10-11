@@ -21,7 +21,7 @@ test('auth api maps login, current user, routes and logout endpoints', async () 
   }
   const api = createAuthApi(createHttpClient({ baseUrl: '/api', tokenProvider: () => 'token', fetcher }))
 
-  const login = await api.login({ username: 'admin', password: 'admin123', captcha: '1234' })
+  const login = await api.login({ username: 'admin', password: 'admin123', captcha: '1234', captchaUuid: 'a'.repeat(32) })
   const me = await api.me()
   const routes = await api.routes()
   await api.changePassword({ oldPassword: 'oldPwd123', newPassword: 'newPwd123' })
@@ -37,6 +37,6 @@ test('auth api maps login, current user, routes and logout endpoints', async () 
     'PUT /api/auth/password',
     'POST /api/auth/logout',
   ])
-  assert.deepEqual(JSON.parse(calls[0].body ?? '{}'), { username: 'admin', password: 'admin123', captcha: '1234' })
+  assert.deepEqual(JSON.parse(calls[0].body ?? '{}'), { username: 'admin', password: 'admin123', captcha: '1234', captchaUuid: 'a'.repeat(32) })
   assert.deepEqual(JSON.parse(calls[3].body ?? '{}'), { oldPassword: 'oldPwd123', newPassword: 'newPwd123' })
 })

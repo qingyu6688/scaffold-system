@@ -2,6 +2,11 @@ package com.scaffold.system.domain;
 
 public class AuthUserRow {
 
+    private long sessionVersion;
+
+    public long getSessionVersion() { return sessionVersion; }
+    public void setSessionVersion(long sessionVersion) { this.sessionVersion = sessionVersion; }
+
     private Long id;
     private String username;
     private String password;

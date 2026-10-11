@@ -55,6 +55,7 @@ public interface SystemManagementMapper {
                    u.nickname,
                    u.phone,
                    u.email,
+                   u.dept_id AS deptId,
                    d.dept_name AS deptName,
                    COALESCE(GROUP_CONCAT(DISTINCT p.post_name ORDER BY p.sort, p.id SEPARATOR ','), '') AS postName,
                    COALESCE(GROUP_CONCAT(DISTINCT r.role_name ORDER BY r.sort, r.id SEPARATOR ','), '') AS roleName,
@@ -85,7 +86,7 @@ public interface SystemManagementMapper {
                   </foreach>
                   </if>
               )
-            GROUP BY u.id, u.username, u.nickname, u.phone, u.email, d.dept_name, u.status, u.create_time, u.last_login_time
+            GROUP BY u.id, u.username, u.nickname, u.phone, u.email, u.dept_id, d.dept_name, u.status, u.create_time, u.last_login_time
             ORDER BY u.id
             LIMIT #{offset}, #{pageSize}
             </script>
@@ -488,7 +489,7 @@ public interface SystemManagementMapper {
 
     @Update("""
             UPDATE sys_user
-            SET nickname = COALESCE(#{row.nickname}, nickname),
+            SET session_version = session_version + 1, nickname = COALESCE(#{row.nickname}, nickname),
                 phone = COALESCE(#{row.phone}, phone),
                 email = COALESCE(#{row.email}, email),
                 dept_id = COALESCE(#{row.deptId}, dept_id),
@@ -500,21 +501,21 @@ public interface SystemManagementMapper {
 
     @Update("""
             UPDATE sys_user
-            SET status = #{status}, update_by = #{operator}
+            SET session_version = session_version + 1, status = #{status}, update_by = #{operator}
             WHERE id = #{id} AND deleted = 0
             """)
     int updateUserStatus(@Param("id") Long id, @Param("status") Integer status, @Param("operator") String operator);
 
     @Update("""
             UPDATE sys_user
-            SET password = #{password}, update_by = #{operator}
+            SET session_version = session_version + 1, password = #{password}, update_by = #{operator}
             WHERE id = #{id} AND deleted = 0
             """)
     int resetUserPassword(@Param("id") Long id, @Param("password") String password, @Param("operator") String operator);
 
     @Update("""
             UPDATE sys_user
-            SET deleted = 1, update_by = #{operator}
+            SET session_version = session_version + 1, deleted = 1, update_by = #{operator}
             WHERE id = #{id} AND deleted = 0
             """)
     int softDeleteUser(@Param("id") Long id, @Param("operator") String operator);
@@ -780,4 +781,43 @@ public interface SystemManagementMapper {
 
     @Delete("DELETE FROM sys_config WHERE id = #{id} AND builtin = 0")
     int deleteConfig(@Param("id") Long id);
+
+    @Select("SELECT id, username, dept_id AS deptId, status FROM sys_user WHERE id = #{id} AND deleted = 0 FOR UPDATE")
+    Map<String, Object> selectUserForUpdate(@Param("id") Long id);
+
+    @Select("SELECT post_id FROM sys_user_post WHERE user_id = #{id} ORDER BY post_id")
+    List<Long> selectUserPostIds(@Param("id") Long id);
+
+    @Select("SELECT role_id FROM sys_user_role WHERE user_id = #{id} ORDER BY role_id")
+    List<Long> selectUserRoleIds(@Param("id") Long id);
+
+    @Select("SELECT r.role_code FROM sys_user_role ur JOIN sys_role r ON r.id = ur.role_id WHERE ur.user_id = #{id} AND r.deleted = 0")
+    List<String> selectUserRoleCodes(@Param("id") Long id);
+
+    @Select("SELECT COUNT(*) FROM sys_dept WHERE id = #{id} AND deleted = 0 AND status = 1")
+    long countActiveDept(@Param("id") Long id);
+
+    @Select("SELECT COUNT(*) FROM sys_role WHERE id = #{id} AND deleted = 0 AND status = 1")
+    long countActiveRole(@Param("id") Long id);
+
+    @Select("SELECT COUNT(*) > 0 FROM sys_role WHERE id = #{id} AND role_code = 'super_admin'")
+    boolean isSuperAdminRole(@Param("id") Long id);
+
+    @Select("SELECT COUNT(*) FROM sys_post WHERE id = #{id} AND deleted = 0 AND status = 1")
+    long countActivePost(@Param("id") Long id);
+
+    @Select("<script>SELECT user_id AS userId, role_id AS itemId FROM sys_user_role WHERE user_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach> ORDER BY role_id</script>")
+    List<Map<String, Object>> selectUserRoleAssignments(@Param("ids") List<Long> ids);
+
+    @Select("<script>SELECT user_id AS userId, post_id AS itemId FROM sys_user_post WHERE user_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach> ORDER BY post_id</script>")
+    List<Map<String, Object>> selectUserPostAssignments(@Param("ids") List<Long> ids);
+
+    @Select("SELECT id, parent_id AS parentId, ancestors FROM sys_dept WHERE deleted = 0 ORDER BY id FOR UPDATE")
+    List<Map<String, Object>> lockDeptTree();
+
+    @Update("UPDATE sys_dept SET ancestors = #{ancestors}, update_by = #{operator} WHERE id = #{id} AND deleted = 0")
+    void updateDeptAncestors(@Param("id") Long id, @Param("ancestors") String ancestors, @Param("operator") String operator);
+
+    @Select("SELECT COUNT(*) FROM sys_menu WHERE id = #{id}")
+    long countMenu(@Param("id") Long id);
 }

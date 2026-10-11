@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuthPermissionApiTest {
     private static final ParameterizedTypeReference<Map<String, Object>> MAP = new ParameterizedTypeReference<>() {};
     @Autowired private TestRestTemplate restTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PasswordEncoder encoder;
     private Long userId;
@@ -67,7 +71,7 @@ class AuthPermissionApiTest {
             assertThat(get(path, headers).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         }
         assertThat(restTemplate.exchange("/api/system/users", HttpMethod.POST,
-                new HttpEntity<>(Map.of("username", "blocked"), headers), MAP).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                new HttpEntity<>(Map.of("username", "blocked", "nickname", "权限拦截测试", "password", "BlockedPwd123", "deptId", 5), headers), MAP).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(get("/api/system/users/options", new HttpHeaders()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(get("/api/system/dict/options/sys_normal_disable", new HttpHeaders()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -101,7 +105,7 @@ class AuthPermissionApiTest {
         return name;
     }
 
-    private String login(String username) { return TestAuthClient.login(restTemplate, username, "admin123"); }
+    private String login(String username) { return TestAuthClient.login(restTemplate, redisTemplate, username, "admin123"); }
     private HttpHeaders headers(String token) {
         HttpHeaders headers = new HttpHeaders(); headers.setBearerAuth(token); return headers;
     }

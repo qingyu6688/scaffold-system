@@ -4,6 +4,8 @@ import com.scaffold.common.domain.R;
 import com.scaffold.common.exception.BusinessException;
 import com.scaffold.framework.audit.OperLog;
 import com.scaffold.framework.security.CaptchaService;
+import com.scaffold.framework.security.LoginGuard;
+import jakarta.servlet.http.HttpServletRequest;
 import com.scaffold.system.domain.dto.ChangePasswordRequest;
 import com.scaffold.system.domain.dto.LoginRequest;
 import com.scaffold.system.domain.vo.CurrentUserResponse;
@@ -25,19 +27,23 @@ public class AuthController {
 
     private final AuthService authService;
     private final CaptchaService captchaService;
+    private final LoginGuard loginGuard;
 
-    public AuthController(AuthService authService, CaptchaService captchaService) {
+    public AuthController(AuthService authService, CaptchaService captchaService, LoginGuard loginGuard) {
         this.authService = authService;
         this.captchaService = captchaService;
+        this.loginGuard = loginGuard;
     }
 
     @GetMapping("/captcha")
-    public R<Map<String, String>> captcha() {
+    public R<Map<String, String>> captcha(HttpServletRequest servletRequest) {
+        loginGuard.checkCaptchaRate(servletRequest.getRemoteAddr());
         return R.success(captchaService.generate());
     }
 
     @PostMapping("/login")
-    public R<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public R<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        loginGuard.checkLoginRate(servletRequest.getRemoteAddr());
         if (!captchaService.verify(request.getCaptchaUuid(), request.getCaptcha())) {
             throw new BusinessException("验证码错误或已过期");
         }

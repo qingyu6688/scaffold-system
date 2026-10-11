@@ -22,7 +22,9 @@ export function downloadCsv<T>(filename: string, columns: CsvColumn<T>[], rows: 
 
 function escapeCell(value: unknown) {
   if (value == null) return ''
-  const text = String(value)
+  // 防止表格软件将外部文本识别为公式。
+  const raw = String(value)
+  const text = /^[\s]*[=+@-]/u.test(raw) ? "'" + raw : raw
   if (/[",\r\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`
   }

@@ -12,6 +12,10 @@ export interface IdResponse {
 }
 
 export interface UserRow {
+  /** 所属部门编号，以及完整的角色、岗位关联，编辑时直接使用。 */
+  deptId: number | null
+  roleIds: number[]
+  postIds: number[]
   id: number
   username: string
   nickname: string

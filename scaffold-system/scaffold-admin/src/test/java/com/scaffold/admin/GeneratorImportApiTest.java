@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +37,9 @@ class GeneratorImportApiTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -140,7 +144,7 @@ class GeneratorImportApiTest {
     }
 
     private String login(String username, String password) {
-        return TestAuthClient.login(restTemplate, username, password);
+        return TestAuthClient.login(restTemplate, redisTemplate, username, password);
     }
 
     private HttpHeaders bearerHeaders(String token) {

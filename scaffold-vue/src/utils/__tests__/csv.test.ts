@@ -22,3 +22,10 @@ test('toCsv serializes headers, rows and escaped cell values', () => {
     '测试质量部,"跨行\n说明",停用,',
   ].join('\n'))
 })
+
+
+test('导出时将公式前缀视为文本，保留引号和换行转义', () => {
+  const values = ['=1+1', '+SUM(1)', '-1+2', '@SUM(1)', '  =1', '\t=1']
+  const csv = toCsv([{ title: '内容', key: 'text' }], values.map(text => ({ text })))
+  assert.equal(csv, ['内容', ...values.map(value => "'" + value)].join('\n'))
+})

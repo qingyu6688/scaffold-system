@@ -17,10 +17,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final TokenStore tokenStore;
+    private final SessionAccountResolver accountResolver;
 
-    public JwtAuthenticationFilter(JwtService jwtService, TokenStore tokenStore) {
+    public JwtAuthenticationFilter(JwtService jwtService, TokenStore tokenStore, SessionAccountResolver accountResolver) {
         this.jwtService = jwtService;
         this.tokenStore = tokenStore;
+        this.accountResolver = accountResolver;
     }
 
     @Override
@@ -30,8 +32,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authorization != null && authorization.startsWith("Bearer ")) {
             String token = authorization.substring(7);
             String username = jwtService.parseUsername(token);
-            boolean activeToken = username != null && tokenStore.usernameOf(token)
-                    .map(username::equals)
+            boolean activeToken = username != null && tokenStore.sessionOf(token)
+                    .map(session -> username.equals(session.username()) && accountResolver.isActive(username, session.version()))
                     .orElse(false);
             if (activeToken && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UsernamePasswordAuthenticationToken authentication =

@@ -22,6 +22,8 @@ export function useDict(type: string): Ref<DictOption[]> {
     const target = entry
     const task = systemApi.dictData.options(type)
       .then(rows => {
+        // 比较引用身份，防止旧账号的请求写入新缓存。
+        // eslint-disable-next-line vue/no-ref-as-operand
         if (cache.get(type) !== target) return
         target.value = rows
           .filter(row => Number(row.status) === 1)
@@ -32,7 +34,11 @@ export function useDict(type: string): Ref<DictOption[]> {
             isDefault: Boolean(row.def),
           }))
       })
-      .catch(() => { if (cache.get(type) === target) inflight.delete(type) })
+      .catch(() => {
+        // 比较引用身份，只清理当前请求对应的缓存。
+        // eslint-disable-next-line vue/no-ref-as-operand
+        if (cache.get(type) === target) inflight.delete(type)
+      })
     inflight.set(type, task)
   }
   return entry

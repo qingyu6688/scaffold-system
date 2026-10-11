@@ -7,22 +7,50 @@
 import argparse
 import asyncio
 import os
+import re
 import secrets
+import socket
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright, expect
 
 
+def test_captcha(uuid):
+    """测试专用 RESP 客户端；必须显式提供回环地址上的独立测试实例端口。"""
+    port = os.environ.get("SCAFFOLD_TEST_REDIS_PORT")
+    if not port:
+        raise RuntimeError("请先设置 SCAFFOLD_TEST_REDIS_PORT，脚本仅适用于独立测试环境")
+    with socket.create_connection(("127.0.0.1", int(port)), timeout=5) as connection:
+        reader = connection.makefile("rb")
+        def command(*parts):
+            encoded = [str(part).encode() for part in parts]
+            connection.sendall(b"*%d\r\n" % len(encoded) + b"".join(b"$%d\r\n" % len(part) + part + b"\r\n" for part in encoded))
+            line = reader.readline()
+            if line.startswith(b"+"): return line[1:-2].decode()
+            if line.startswith(b"$") and int(line[1:-2]) >= 0:
+                size = int(line[1:-2]); value = reader.read(size); reader.read(2)
+                return value.decode()
+            raise RuntimeError("测试 Redis 读取失败，请检查实例、密码及数据库编号")
+        password = os.environ.get("SCAFFOLD_TEST_REDIS_PASSWORD")
+        if password: command("AUTH", password)
+        command("SELECT", os.environ.get("SCAFFOLD_TEST_REDIS_DATABASE", "0"))
+        return command("GET", "captcha:" + uuid)
+
+
 async def sign_in(page, username, password, destination=None):
     await page.wait_for_url("**/login**")
+    # 等初始验证码请求结束，再显式刷新，避免捕获上一次仍在途的响应。
+    await page.wait_for_load_state("networkidle")
     await page.get_by_role("button", name="登录", exact=True).wait_for()
     await expect(page.get_by_role("button", name="登录", exact=True)).to_be_enabled()
-    async with page.expect_response("**/api/auth/captcha") as next_captcha:
+    async with page.expect_request("**/api/auth/captcha") as next_captcha:
         await page.get_by_role("button", name="看不清，换一张", exact=True).click()
-    await next_captcha.value
+    captcha_request = await next_captcha.value
+    captcha_response = await (await captcha_request.response()).json()
     await expect(page.get_by_role("button", name="看不清，换一张", exact=True)).to_be_enabled()
-    captcha = (await page.locator(".captcha-code").inner_text()).replace(" ", "").replace("\n", "")
+    captcha = test_captcha(captcha_response["data"]["uuid"])
     await page.get_by_placeholder("请输入账号", exact=True).fill(username)
     await page.get_by_placeholder("请输入密码", exact=True).fill(password)
     await page.get_by_placeholder("请输入右侧字符", exact=True).fill(captcha)
@@ -65,7 +93,7 @@ async def main(base_url):
         try:
             captcha = (await (await api.get("auth/captcha")).json())["data"]
             response = await api.post("auth/login", data={"username": "admin", "password": password,
-                "captcha": captcha["code"], "captchaUuid": captcha["uuid"]})
+                "captcha": test_captcha(captcha["uuid"]), "captchaUuid": captcha["uuid"]})
             assert response.ok, "测试管理员登录失败"
             token = (await response.json())["data"]["token"]
             await api.dispose()
@@ -164,6 +192,50 @@ async def main(base_url):
             assert not errors, "浏览器运行错误：" + str(errors)
             assert not unexpected, "非预期接口失败：" + str(unexpected)
             print("PASS: 慢退出、旧 401、重新登录及无菜单账号刷新")
+
+            # 真实表单回归：两个角色和两个岗位必须完整回显并原样提交。
+            await sign_out(page)
+            await sign_in(page, "admin", password, "/dashboard")
+            response = await api.put("system/users/" + str(user_id), data={"roleIds": [2, role_id], "postIds": [1, 2]})
+            assert response.ok, "多角色夹具配置失败"
+            await page.goto(base_url + "/system/user?keyword=" + username)
+            await page.get_by_role("button", name="编辑", exact=True).click()
+            dialog = page.get_by_role("dialog", name="编辑用户")
+            await expect(dialog.get_by_role("group", name="角色").locator("input:checked")).to_have_count(2)
+            await expect(dialog.get_by_role("group", name="岗位").locator("input:checked")).to_have_count(2)
+            screenshots = Path(__file__).resolve().parents[2] / ".tmp-verification"
+            screenshots.mkdir(exist_ok=True)
+            await expect(dialog).to_have_css("opacity", "1")
+            await expect(dialog.locator("..")).to_have_css("opacity", "1")
+            await page.screenshot(path=str(screenshots / "用户多角色编辑.png"), full_page=True)
+            await dialog.get_by_placeholder("真实姓名", exact=True).fill("多角色回归已编辑")
+            async with page.expect_request(lambda request: request.method == "PUT" and request.url.endswith("/api/system/users/" + str(user_id))) as saved:
+                await dialog.get_by_role("button", name="保存", exact=True).click()
+            payload = (await saved.value).post_data_json
+            assert set(payload["roleIds"]) == {2, role_id}, "编辑提交丢失角色"
+            assert set(payload["postIds"]) == {1, 2}, "编辑提交丢失岗位"
+            assert payload["deptId"] == 5, "编辑回显了错误的部门"
+            await expect(dialog).to_be_hidden()
+            response = await api.get("system/users", params={"keyword": username})
+            saved_row = (await response.json())["data"]["rows"][0]
+            assert set(saved_row["roleIds"]) == {2, role_id} and set(saved_row["postIds"]) == {1, 2}, "数据库未保留完整关联"
+            print("PASS: 多角色、多岗位表单回显和保存，部门编号保持一致")
+
+            # 自助改密成功后应立即回到登录页，新密码可以再次登录。
+            await sign_out(page)
+            await sign_in(page, username, fixture_password, "/system/user")
+            await page.locator(".user-chip").click()
+            await page.get_by_role("menuitem", name="修改密码", exact=True).click()
+            password_dialog = page.get_by_role("dialog", name="修改密码")
+            await password_dialog.get_by_label("当前密码").fill(fixture_password)
+            await password_dialog.get_by_label(re.compile(r"^新密码")).fill(fixture_password + "X")
+            await password_dialog.get_by_label("确认新密码").fill(fixture_password + "X")
+            await password_dialog.get_by_role("button", name="确认修改", exact=True).click()
+            await page.wait_for_url("**/login**")
+            await sign_in(page, username, fixture_password + "X", "/system/user")
+            assert not errors, "浏览器运行错误：" + str(errors)
+            print("PASS: 自助改密后立即退出并使用新密码登录")
+
         except Exception:
             print("最近接口状态：", requests[-14:] if 'requests' in locals() else [])
             raise

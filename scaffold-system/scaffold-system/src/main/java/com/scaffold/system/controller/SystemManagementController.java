@@ -17,6 +17,10 @@ import com.scaffold.system.domain.dto.UserStatusRequest;
 import com.scaffold.system.domain.dto.UserWriteRequest;
 import com.scaffold.system.domain.vo.IdResponse;
 import com.scaffold.system.service.SystemManagementService;
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
+import org.springframework.validation.annotation.Validated;
+import com.scaffold.system.domain.dto.WriteValidation;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -76,14 +80,14 @@ public class SystemManagementController {
     @PostMapping("/users")
     @RequiresPermission("system:user:add")
     @OperLog(module = "用户管理", action = "新增")
-    public R<IdResponse> createUser(@RequestBody UserWriteRequest request) {
+    public R<IdResponse> createUser(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody UserWriteRequest request) {
         return R.success(service.createUser(request));
     }
 
     @PutMapping("/users/{id}")
     @RequiresPermission("system:user:edit")
     @OperLog(module = "用户管理", action = "修改")
-    public R<Void> updateUser(@PathVariable Long id, @RequestBody UserWriteRequest request) {
+    public R<Void> updateUser(@PathVariable Long id, @Valid @RequestBody UserWriteRequest request) {
         service.updateUser(id, request);
         return R.success(null);
     }
@@ -91,7 +95,7 @@ public class SystemManagementController {
     @PutMapping("/users/{id}/status")
     @RequiresPermission("system:user:edit")
     @OperLog(module = "用户管理", action = "状态变更")
-    public R<Void> updateUserStatus(@PathVariable Long id, @RequestBody UserStatusRequest request) {
+    public R<Void> updateUserStatus(@PathVariable Long id, @Valid @RequestBody UserStatusRequest request) {
         service.updateUserStatus(id, request);
         return R.success(null);
     }
@@ -99,7 +103,7 @@ public class SystemManagementController {
     @PutMapping("/users/{id}/password")
     @RequiresPermission("system:user:resetPwd")
     @OperLog(module = "用户管理", action = "重置密码")
-    public R<Void> resetUserPassword(@PathVariable Long id, @RequestBody UserPasswordResetRequest request) {
+    public R<Void> resetUserPassword(@PathVariable Long id, @Valid @RequestBody UserPasswordResetRequest request) {
         service.resetUserPassword(id, request);
         return R.success(null);
     }
@@ -153,14 +157,14 @@ public class SystemManagementController {
     @PostMapping("/roles")
     @RequiresPermission("system:role:add")
     @OperLog(module = "角色管理", action = "新增")
-    public R<IdResponse> createRole(@RequestBody RoleWriteRequest request) {
+    public R<IdResponse> createRole(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody RoleWriteRequest request) {
         return R.success(service.createRole(request));
     }
 
     @PutMapping("/roles/{id}")
     @RequiresPermission("system:role:edit")
     @OperLog(module = "角色管理", action = "修改")
-    public R<Void> updateRole(@PathVariable Long id, @RequestBody RoleWriteRequest request) {
+    public R<Void> updateRole(@PathVariable Long id, @Valid @RequestBody RoleWriteRequest request) {
         service.updateRole(id, request);
         return R.success(null);
     }
@@ -194,14 +198,14 @@ public class SystemManagementController {
     @PostMapping("/menus")
     @RequiresPermission("system:menu:add")
     @OperLog(module = "菜单管理", action = "新增")
-    public R<IdResponse> createMenu(@RequestBody MenuWriteRequest request) {
+    public R<IdResponse> createMenu(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody MenuWriteRequest request) {
         return R.success(service.createMenu(request));
     }
 
     @PutMapping("/menus/{id}")
     @RequiresPermission("system:menu:edit")
     @OperLog(module = "菜单管理", action = "修改")
-    public R<Void> updateMenu(@PathVariable Long id, @RequestBody MenuWriteRequest request) {
+    public R<Void> updateMenu(@PathVariable Long id, @Valid @RequestBody MenuWriteRequest request) {
         service.updateMenu(id, request);
         return R.success(null);
     }
@@ -235,14 +239,14 @@ public class SystemManagementController {
     @PostMapping("/depts")
     @RequiresPermission("system:dept:add")
     @OperLog(module = "部门管理", action = "新增")
-    public R<IdResponse> createDept(@RequestBody DeptWriteRequest request) {
+    public R<IdResponse> createDept(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody DeptWriteRequest request) {
         return R.success(service.createDept(request));
     }
 
     @PutMapping("/depts/{id}")
     @RequiresPermission("system:dept:edit")
     @OperLog(module = "部门管理", action = "修改")
-    public R<Void> updateDept(@PathVariable Long id, @RequestBody DeptWriteRequest request) {
+    public R<Void> updateDept(@PathVariable Long id, @Valid @RequestBody DeptWriteRequest request) {
         service.updateDept(id, request);
         return R.success(null);
     }
@@ -277,14 +281,14 @@ public class SystemManagementController {
     @PostMapping("/posts")
     @RequiresPermission("system:post:add")
     @OperLog(module = "岗位管理", action = "新增")
-    public R<IdResponse> createPost(@RequestBody PostWriteRequest request) {
+    public R<IdResponse> createPost(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody PostWriteRequest request) {
         return R.success(service.createPost(request));
     }
 
     @PutMapping("/posts/{id}")
     @RequiresPermission("system:post:edit")
     @OperLog(module = "岗位管理", action = "修改")
-    public R<Void> updatePost(@PathVariable Long id, @RequestBody PostWriteRequest request) {
+    public R<Void> updatePost(@PathVariable Long id, @Valid @RequestBody PostWriteRequest request) {
         service.updatePost(id, request);
         return R.success(null);
     }
@@ -330,14 +334,14 @@ public class SystemManagementController {
     @PostMapping("/dict/types")
     @RequiresPermission("system:dict:add")
     @OperLog(module = "字典管理", action = "新增字典类型")
-    public R<IdResponse> createDictType(@RequestBody DictTypeWriteRequest request) {
+    public R<IdResponse> createDictType(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody DictTypeWriteRequest request) {
         return R.success(service.createDictType(request));
     }
 
     @PutMapping("/dict/types/{id}")
     @RequiresPermission("system:dict:edit")
     @OperLog(module = "字典管理", action = "修改字典类型")
-    public R<Void> updateDictType(@PathVariable Long id, @RequestBody DictTypeWriteRequest request) {
+    public R<Void> updateDictType(@PathVariable Long id, @Valid @RequestBody DictTypeWriteRequest request) {
         service.updateDictType(id, request);
         return R.success(null);
     }
@@ -353,14 +357,14 @@ public class SystemManagementController {
     @PostMapping("/dict/data")
     @RequiresPermission("system:dict:add")
     @OperLog(module = "字典管理", action = "新增字典数据")
-    public R<IdResponse> createDictData(@RequestBody DictDataWriteRequest request) {
+    public R<IdResponse> createDictData(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody DictDataWriteRequest request) {
         return R.success(service.createDictData(request));
     }
 
     @PutMapping("/dict/data/{id}")
     @RequiresPermission("system:dict:edit")
     @OperLog(module = "字典管理", action = "修改字典数据")
-    public R<Void> updateDictData(@PathVariable Long id, @RequestBody DictDataWriteRequest request) {
+    public R<Void> updateDictData(@PathVariable Long id, @Valid @RequestBody DictDataWriteRequest request) {
         service.updateDictData(id, request);
         return R.success(null);
     }
@@ -391,14 +395,14 @@ public class SystemManagementController {
     @PostMapping("/configs")
     @RequiresPermission("system:config:add")
     @OperLog(module = "参数配置", action = "新增")
-    public R<IdResponse> createConfig(@RequestBody ConfigWriteRequest request) {
+    public R<IdResponse> createConfig(@Validated({Default.class, WriteValidation.Create.class}) @RequestBody ConfigWriteRequest request) {
         return R.success(service.createConfig(request));
     }
 
     @PutMapping("/configs/{id}")
     @RequiresPermission("system:config:edit")
     @OperLog(module = "参数配置", action = "修改")
-    public R<Void> updateConfig(@PathVariable Long id, @RequestBody ConfigWriteRequest request) {
+    public R<Void> updateConfig(@PathVariable Long id, @Valid @RequestBody ConfigWriteRequest request) {
         service.updateConfig(id, request);
         return R.success(null);
     }

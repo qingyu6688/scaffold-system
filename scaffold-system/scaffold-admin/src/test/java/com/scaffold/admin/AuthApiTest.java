@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -31,6 +32,9 @@ class AuthApiTest {
     private TestRestTemplate restTemplate;
 
     @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -54,7 +58,8 @@ class AuthApiTest {
         assertThat(body).containsEntry("code", 200);
         Map<String, Object> data = dataOf(body);
         assertThat(data).containsEntry("username", "admin");
-        assertThat(data).containsEntry("nickname", "周明远");
+        assertThat(data).containsEntry("nickname", jdbcTemplate.queryForObject(
+                "SELECT nickname FROM sys_user WHERE username = ? AND deleted = 0", String.class, "admin"));
         assertThat(listOf(data, "roles")).contains("super_admin");
         assertThat(listOf(data, "permissions")).contains("system:user:list");
     }
@@ -143,7 +148,7 @@ class AuthApiTest {
 
     @Test
     void loginWithWrongPasswordReturnsBusinessError() {
-        ResponseEntity<Map<String, Object>> response = TestAuthClient.loginResponse(restTemplate, "admin", "bad-password");
+        ResponseEntity<Map<String, Object>> response = TestAuthClient.loginResponse(restTemplate, redisTemplate, "admin", "bad-password");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("code", 400);
@@ -173,7 +178,7 @@ class AuthApiTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).containsEntry("code", 200);
 
-            ResponseEntity<Map<String, Object>> oldPasswordLogin = TestAuthClient.loginResponse(restTemplate, username, "oldPwd123");
+            ResponseEntity<Map<String, Object>> oldPasswordLogin = TestAuthClient.loginResponse(restTemplate, redisTemplate, username, "oldPwd123");
             assertThat(oldPasswordLogin.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
             assertThat(login(username, "newPwd123")).isNotBlank();
@@ -210,7 +215,7 @@ class AuthApiTest {
     }
 
     private String login(String username, String password) {
-        return TestAuthClient.login(restTemplate, username, password);
+        return TestAuthClient.login(restTemplate, redisTemplate, username, password);
     }
 
     private String uniqueSuffix() {

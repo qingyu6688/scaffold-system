@@ -38,11 +38,13 @@ public class SystemManagementService {
     private final SystemManagementMapper mapper;
     private final PasswordEncoder passwordEncoder;
     private final SystemPermissionResolver permissionResolver;
+    private final UserAccessPolicy accessPolicy;
 
-    public SystemManagementService(SystemManagementMapper mapper, PasswordEncoder passwordEncoder, SystemPermissionResolver permissionResolver) {
+    public SystemManagementService(SystemManagementMapper mapper, PasswordEncoder passwordEncoder, SystemPermissionResolver permissionResolver, UserAccessPolicy accessPolicy) {
         this.mapper = mapper;
         this.passwordEncoder = passwordEncoder;
         this.permissionResolver = permissionResolver;
+        this.accessPolicy = accessPolicy;
     }
 
     /** 用户页所需的引用选项，避免为只读用户申请角色、岗位和参数管理权限。 */
@@ -50,8 +52,8 @@ public class SystemManagementService {
         String username = currentUsername();
         boolean canEdit = permissionResolver.hasPermission(username, "system:user:add")
                 || permissionResolver.hasPermission(username, "system:user:edit");
-        boolean canSetPassword = permissionResolver.hasPermission(username, "system:user:add")
-                || permissionResolver.hasPermission(username, "system:user:resetPwd");
+        boolean superAdmin = accessPolicy.isSuperAdmin();
+        List<Long> assignableRoles = superAdmin ? List.of() : accessPolicy.assignableRoleIds();
         List<Map<String, Object>> depts = mapper.selectDepts(null, null).stream()
                 .map(row -> {
                     Map<String, Object> option = new LinkedHashMap<>();
@@ -59,12 +61,11 @@ public class SystemManagementService {
                     return option;
                 }).toList();
         List<Map<String, Object>> roles = canEdit ? mapper.selectRoles(null, 1, 0, 5000).stream()
+                .filter(row -> superAdmin || assignableRoles.contains(numberAsLong(row.get("id"))))
                 .map(row -> Map.of("id", row.get("id"), "name", row.get("name"))).toList() : List.of();
         List<Map<String, Object>> posts = canEdit ? mapper.selectPosts(null, 1, 0, 5000).stream()
                 .map(row -> Map.of("id", row.get("id"), "name", row.get("postName"))).toList() : List.of();
-        String initialPassword = canSetPassword ? mapper.selectConfigs("sys.user.initPassword", 0, 10).stream()
-                .filter(row -> "sys.user.initPassword".equals(row.get("key")))
-                .map(row -> String.valueOf(row.get("value"))).findFirst().orElse("") : "";
+        String initialPassword = "";
         return Map.of("depts", treeOf(depts), "roles", roles, "posts", posts, "initPassword", initialPassword);
     }
 
@@ -77,7 +78,7 @@ public class SystemManagementService {
         Page page = pageOf(query);
         DataScopeCriteria scope = DataScopeContext.current();
         long total = mapper.countUsers(keyword, status, deptId, postId, scope);
-        return PageResult.of(mapper.selectUsers(keyword, status, deptId, postId, scope, page.offset(), page.pageSize()), total, page.pageNum(), page.pageSize());
+        return PageResult.of(userRows(mapper.selectUsers(keyword, status, deptId, postId, scope, page.offset(), page.pageSize())), total, page.pageNum(), page.pageSize());
     }
 
     @DataScope
@@ -352,6 +353,9 @@ public class SystemManagementService {
 
     @Transactional
     public IdResponse createUser(UserWriteRequest request) {
+        accessPolicy.checkDepartment(request.getDeptId());
+        accessPolicy.checkRoles(null, request.getDeptId(), request.getRoleIds());
+        accessPolicy.checkPosts(request.getPostIds());
         String username = required(request.getUsername(), "登录账号不能为空");
         String nickname = required(request.getNickname(), "用户昵称不能为空");
         if (mapper.countUsername(username, null) > 0) {
@@ -359,7 +363,7 @@ public class SystemManagementService {
         }
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("username", username);
-        row.put("password", passwordEncoder.encode(defaultString(request.getPassword(), "admin123")));
+        row.put("password", passwordEncoder.encode(required(request.getPassword(), "初始密码不能为空")));
         row.put("nickname", nickname);
         row.put("phone", request.getPhone());
         row.put("email", request.getEmail());
@@ -374,6 +378,20 @@ public class SystemManagementService {
 
     @Transactional
     public void updateUser(Long id, UserWriteRequest request) {
+        Map<String, Object> target = accessPolicy.requireWritableUser(id);
+        if (request.getDeptId() != null && !request.getDeptId().equals(numberAsLong(target.get("deptId")))) {
+            accessPolicy.checkDepartment(request.getDeptId());
+        }
+        Long deptId = request.getDeptId() == null ? numberAsLong(target.get("deptId")) : request.getDeptId();
+        accessPolicy.checkRoles(id, deptId, request.getRoleIds());
+        if (id == 1L && request.getRoleIds() != null
+                && request.getRoleIds().stream().noneMatch(mapper::isSuperAdminRole)) {
+            throw new BusinessException("内置管理员必须保留超级管理员角色");
+        }
+        accessPolicy.checkPosts(id, request.getPostIds());
+        if (id == 1L && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException("内置管理员不允许停用");
+        }
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("nickname", trimToNull(request.getNickname()));
         row.put("phone", request.getPhone());
@@ -393,6 +411,7 @@ public class SystemManagementService {
 
     @Transactional
     public void updateUserStatus(Long id, UserStatusRequest request) {
+        accessPolicy.requireWritableUser(id);
         Integer status = request.getStatus();
         if (status == null || (status != 0 && status != 1)) {
             throw new BusinessException("用户状态只能为正常或停用");
@@ -407,7 +426,8 @@ public class SystemManagementService {
 
     @Transactional
     public void resetUserPassword(Long id, UserPasswordResetRequest request) {
-        String password = defaultString(request.getPassword(), "Yy@123456");
+        accessPolicy.requireWritableUser(id);
+        String password = required(request.getPassword(), "新密码不能为空");
         if (password.length() < 6 || password.length() > 64) {
             throw new BusinessException("密码长度必须在6到64位之间");
         }
@@ -418,6 +438,7 @@ public class SystemManagementService {
 
     @Transactional
     public void deleteUser(Long id) {
+        accessPolicy.requireWritableUser(id);
         if (id == 1L) {
             throw new BusinessException("内置管理员不允许删除");
         }
@@ -428,6 +449,7 @@ public class SystemManagementService {
 
     @Transactional
     public IdResponse createRole(RoleWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
         String name = required(request.getName(), "角色名称不能为空");
         String code = required(request.getCode(), "角色编码不能为空");
         if (mapper.countRoleCode(code, null) > 0) {
@@ -448,6 +470,7 @@ public class SystemManagementService {
 
     @Transactional
     public void updateRole(Long id, RoleWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("name", trimToNull(request.getName()));
         row.put("dataScope", trimToNull(request.getDataScope()));
@@ -464,6 +487,7 @@ public class SystemManagementService {
 
     @Transactional
     public void deleteRole(Long id) {
+        accessPolicy.requireSuperAdmin();
         if (mapper.countRoleUsers(id) > 0) {
             throw new BusinessException("角色已分配用户，不能删除");
         }
@@ -475,6 +499,8 @@ public class SystemManagementService {
 
     @Transactional
     public IdResponse createDept(DeptWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
+        mapper.lockDeptTree();
         String name = required(request.getName(), "部门名称不能为空");
         Long parentId = request.getParentId() == null ? 0L : request.getParentId();
         Map<String, Object> row = new LinkedHashMap<>();
@@ -492,9 +518,12 @@ public class SystemManagementService {
 
     @Transactional
     public void updateDept(Long id, DeptWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("parentId", request.getParentId());
-        row.put("ancestors", request.getParentId() == null ? null : ancestorsFor(request.getParentId()));
+        List<Map<String, Object>> tree = mapper.lockDeptTree();
+        Map<Long, String> paths = DepartmentPaths.move(tree, id, request.getParentId());
+        row.put("ancestors", paths.get(id));
         row.put("name", trimToNull(request.getName()));
         row.put("leader", request.getLeader());
         row.put("phone", request.getPhone());
@@ -504,10 +533,15 @@ public class SystemManagementService {
         if (mapper.updateDept(id, row, currentUsername()) == 0) {
             throw new BusinessException("部门不存在或已删除");
         }
+        paths.forEach((childId, ancestors) -> {
+            if (!childId.equals(id)) mapper.updateDeptAncestors(childId, ancestors, currentUsername());
+        });
     }
 
     @Transactional
     public void deleteDept(Long id) {
+        accessPolicy.requireSuperAdmin();
+        mapper.lockDeptTree();
         if (mapper.countDeptChildren(id) > 0) {
             throw new BusinessException("存在下级部门，不能删除");
         }
@@ -521,6 +555,7 @@ public class SystemManagementService {
 
     @Transactional
     public IdResponse createMenu(MenuWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
         String name = required(request.getName(), "菜单名称不能为空");
         Long menuId = mapper.nextMenuId();
         Map<String, Object> row = new LinkedHashMap<>();
@@ -541,6 +576,7 @@ public class SystemManagementService {
 
     @Transactional
     public void updateMenu(Long id, MenuWriteRequest request) {
+        accessPolicy.requireSuperAdmin();
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("parentId", request.getParentId());
         row.put("name", trimToNull(request.getName()));
@@ -559,6 +595,7 @@ public class SystemManagementService {
 
     @Transactional
     public void deleteMenu(Long id) {
+        accessPolicy.requireSuperAdmin();
         if (mapper.countMenuChildren(id) > 0) {
             throw new BusinessException("存在子菜单，不能删除");
         }
@@ -727,6 +764,27 @@ public class SystemManagementService {
                 .toList();
     }
 
+    private List<Map<String, Object>> userRows(List<Map<String, Object>> rows) {
+        if (rows.isEmpty()) return rows;
+        List<Long> ids = rows.stream().map(row -> numberAsLong(row.get("id"))).toList();
+        Map<Long, List<Long>> roles = assignments(mapper.selectUserRoleAssignments(ids));
+        Map<Long, List<Long>> posts = assignments(mapper.selectUserPostAssignments(ids));
+        return rows.stream().map(row -> {
+            Map<String, Object> copy = new LinkedHashMap<>(row);
+            Long id = numberAsLong(row.get("id"));
+            copy.put("roleIds", roles.getOrDefault(id, List.of()));
+            copy.put("postIds", posts.getOrDefault(id, List.of()));
+            return copy;
+        }).toList();
+    }
+
+    private Map<Long, List<Long>> assignments(List<Map<String, Object>> rows) {
+        Map<Long, List<Long>> result = new LinkedHashMap<>();
+        rows.forEach(row -> result.computeIfAbsent(numberAsLong(row.get("userId")), key -> new ArrayList<>())
+                .add(numberAsLong(row.get("itemId"))));
+        return result;
+    }
+
     private List<Map<String, Object>> roleRows(List<Map<String, Object>> rows) {
         return rows.stream()
                 .map(row -> {
@@ -776,6 +834,9 @@ public class SystemManagementService {
     }
 
     private void replaceRoleMenus(Long roleId, List<Long> menuIds) {
+        if (menuIds != null && menuIds.stream().anyMatch(id -> mapper.countMenu(id) != 1)) {
+            throw new BusinessException("关联菜单不存在");
+        }
         mapper.deleteRoleMenus(roleId);
         if (menuIds != null) {
             menuIds.forEach(menuId -> mapper.insertRoleMenu(roleId, menuId));
@@ -839,6 +900,7 @@ public class SystemManagementService {
 
     private String csvCell(Object value) {
         String text = value == null ? "" : String.valueOf(value);
+        if (text.matches("(?s)^[\\s]*[=+@-].*")) text = "\'" + text;
         if (text.contains("\"")) {
             text = text.replace("\"", "\"\"");
         }

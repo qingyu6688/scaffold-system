@@ -22,7 +22,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<R<Void>> handleBusinessException(BusinessException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(R.error(ex.code(), ex.getMessage()));
+        HttpStatus status = HttpStatus.resolve(ex.code());
+        return ResponseEntity.status(status != null && status.isError() ? status : HttpStatus.BAD_REQUEST)
+                .body(R.error(ex.code(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

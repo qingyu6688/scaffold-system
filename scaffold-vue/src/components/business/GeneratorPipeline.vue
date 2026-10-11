@@ -23,7 +23,7 @@ interface ColumnRow { id: number; col: string; comment: string; javaField: strin
 const props = defineProps<{ table: GenTable | null; step?: 1 | 2 | 3 }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'saved'): void; (e: 'generate', table: GenTable): void }>()
 
-const step = ref<1 | 2 | 3>(1)
+const activeStep = ref<1 | 2 | 3>(1)
 const columns = ref<ColumnRow[]>([])
 const files = ref<GeneratorFile[]>([])
 const activePath = ref('')
@@ -38,7 +38,7 @@ const codeEl = ref<HTMLElement | null>(null)
 
 watch(() => props.table, async (table) => {
   if (!table) return
-  step.value = props.step ?? 1
+  activeStep.value = props.step ?? 1
   Object.assign(form, { tableComment: table.tableComment, synced: table.synced })
   columns.value = []
   files.value = []
@@ -57,7 +57,7 @@ watch(() => props.table, async (table) => {
 
 /* ── 步骤切换：玻璃滑块 + 内容横移 ── */
 const STEPS = [{ n: 1 as const, label: '表信息', icon: 'database' }, { n: 2 as const, label: '字段映射', icon: 'layers' }, { n: 3 as const, label: '代码预览', icon: 'code' }]
-watch(step, async (next, prev) => {
+watch(activeStep, async (next, prev) => {
   await nextTick()
   slideThumb(thumb.value, stepper.value?.querySelector<HTMLElement>(`[data-step="${next}"]`) ?? null, 'x', prev === undefined)
   if (stage.value && prev !== undefined && !motionSkipped()) {
@@ -65,7 +65,7 @@ watch(step, async (next, prev) => {
   }
   if (next === 3) playCode()
 }, { flush: 'post' })
-watch(() => Boolean(props.table), open => { if (open) nextTick(() => slideThumb(thumb.value, stepper.value?.querySelector<HTMLElement>(`[data-step="${step.value}"]`) ?? null, 'x', true)) })
+watch(() => Boolean(props.table), open => { if (open) nextTick(() => slideThumb(thumb.value, stepper.value?.querySelector<HTMLElement>(`[data-step="${activeStep.value}"]`) ?? null, 'x', true)) })
 
 /* ── ② 字段映射图 ── */
 const FORM_LABEL: Record<string, string> = { input: '输入框', textarea: '多行文本', select: '下拉选择', radio: '单选', checkbox: '多选', datetime: '日期时间', date: '日期', number: '数字', upload: '上传', editor: '富文本' }
@@ -129,7 +129,7 @@ function playCode() {
     gsap.fromTo(rows, { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.36, ease: EASE.reveal, stagger: 0.012, clearProps: 'opacity,transform', overwrite: 'auto' })
   })
 }
-watch(activePath, () => { if (step.value === 3) playCode() })
+watch(activePath, () => { if (activeStep.value === 3) playCode() })
 
 async function copyCode() {
   const ok = await copyText(activeFile.value?.code ?? '')
@@ -155,14 +155,14 @@ async function save() {
   <Modal :open="Boolean(table)" title="代码生成流水线" :sub="table?.tableName" :width="1120" @close="emit('close')">
     <div ref="stepper" class="pipe-steps m-groove" role="tablist" aria-label="生成步骤">
       <span ref="thumb" class="pipe-thumb m-pill" aria-hidden="true" />
-      <button v-for="s in STEPS" :key="s.n" type="button" role="tab" :data-step="s.n" :aria-selected="step === s.n" :class="['pipe-step', { 'is-on': step === s.n, 'is-done': step > s.n }]" @click="step = s.n">
+      <button v-for="s in STEPS" :key="s.n" type="button" role="tab" :data-step="s.n" :aria-selected="activeStep === s.n" :class="['pipe-step', { 'is-on': activeStep === s.n, 'is-done': activeStep > s.n }]" @click="activeStep = s.n">
         <span class="pipe-step-n tnum">{{ s.n }}</span><Icon :name="s.icon" :size="14" />{{ s.label }}
       </button>
     </div>
 
     <div ref="stage" class="pipe-stage">
       <!-- ① 表信息 -->
-      <div v-if="step === 1" class="pipe-info">
+      <div v-if="activeStep === 1" class="pipe-info">
         <div class="form-grid">
           <Field label="表说明" span hint="用于生成页面标题与菜单名称">
             <TextInput v-model="form.tableComment" placeholder="如：客户档案" />
@@ -184,7 +184,7 @@ async function save() {
       </div>
 
       <!-- ② 字段映射 -->
-      <div v-else-if="step === 2" class="pipe-map">
+      <div v-else-if="activeStep === 2" class="pipe-map">
         <div class="pipe-map-head" aria-hidden="true">
           <span style="left: 24%">数据库字段</span><span style="left: 50%">Java 属性</span><span style="left: 78%">页面呈现</span>
         </div>
@@ -222,10 +222,10 @@ async function save() {
     </div>
 
     <template #footer>
-      <Button v-if="step > 1" variant="ghost" icon="chevronLeft" @click="step = (step - 1) as 1 | 2">上一步</Button>
+      <Button v-if="activeStep > 1" variant="ghost" icon="chevronLeft" @click="activeStep = (activeStep - 1) as 1 | 2">上一步</Button>
       <span style="flex: 1" />
       <Button variant="secondary" :loading="saving" @click="save">保存配置</Button>
-      <Button v-if="step < 3" variant="primary" @click="step = (step + 1) as 2 | 3">下一步<Icon name="arrowRight" :size="14" /></Button>
+      <Button v-if="activeStep < 3" variant="primary" @click="activeStep = (activeStep + 1) as 2 | 3">下一步<Icon name="arrowRight" :size="14" /></Button>
       <Button v-else variant="primary" icon="download" @click="table && emit('generate', table)">生成并下载</Button>
     </template>
   </Modal>

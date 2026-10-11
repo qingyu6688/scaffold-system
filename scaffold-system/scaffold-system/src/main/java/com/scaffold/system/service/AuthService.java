@@ -2,6 +2,7 @@ package com.scaffold.system.service;
 
 import com.scaffold.common.exception.BusinessException;
 import com.scaffold.framework.security.JwtService;
+import com.scaffold.framework.security.LoginGuard;
 import com.scaffold.framework.security.TokenStore;
 import com.scaffold.system.domain.AuthUserRow;
 import com.scaffold.system.domain.MenuRow;
@@ -31,17 +32,21 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenStore tokenStore;
+    private final LoginGuard loginGuard;
 
-    public AuthService(AuthMapper authMapper, PasswordEncoder passwordEncoder, JwtService jwtService, TokenStore tokenStore) {
+    public AuthService(AuthMapper authMapper, PasswordEncoder passwordEncoder, JwtService jwtService, TokenStore tokenStore, LoginGuard loginGuard) {
         this.authMapper = authMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.tokenStore = tokenStore;
+        this.loginGuard = loginGuard;
     }
 
     public LoginResponse login(LoginRequest request) {
+        loginGuard.checkAccount(request.getUsername());
         AuthUserRow user = authMapper.selectUserByUsername(request.getUsername());
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            loginGuard.failed(request.getUsername());
             authMapper.insertLoginLog(request.getUsername(), 0, "账号或密码错误");
             throw new BusinessException("账号或密码错误");
         }
@@ -49,8 +54,9 @@ public class AuthService {
             authMapper.insertLoginLog(request.getUsername(), 0, "账号已停用");
             throw new BusinessException("账号已停用");
         }
+        loginGuard.succeeded(user.getUsername());
         String token = jwtService.generateToken(user.getId(), user.getUsername());
-        tokenStore.store(token, user.getUsername(), jwtService.expiresSeconds());
+        tokenStore.store(token, user.getUsername(), jwtService.expiresSeconds(), user.getSessionVersion());
         authMapper.insertLoginLog(user.getUsername(), 1, "登录成功");
         authMapper.updateLastLoginTime(user.getId());
         return new LoginResponse(token, jwtService.expiresSeconds());
@@ -75,7 +81,8 @@ public class AuthService {
                 user.getDeptId(),
                 user.getDeptName(),
                 roleCodes,
-                roleCodes.contains(SUPER_ADMIN) ? authMapper.selectAllPermissions() : authMapper.selectPermissions(user.getId())
+                roleCodes.contains(SUPER_ADMIN) ? authMapper.selectAllPermissions()
+                        : SystemPermissionResolver.effectivePermissions(authMapper.selectPermissions(user.getId()))
         );
     }
 
@@ -96,7 +103,7 @@ public class AuthService {
         if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
             throw new BusinessException("新密码不能与旧密码一致");
         }
-        int updated = authMapper.updatePassword(user.getId(), user.getUsername(), passwordEncoder.encode(request.getNewPassword()));
+        int updated = authMapper.updatePassword(user.getId(), user.getUsername(), passwordEncoder.encode(request.getNewPassword()), user.getPassword());
         if (updated == 0) {
             throw new BusinessException("密码修改失败");
         }

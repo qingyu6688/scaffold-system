@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +28,9 @@ class SystemReadApiTest {
 
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     @Test
     void userAndRoleListsReturnFrontendFields() {
@@ -188,7 +192,7 @@ class SystemReadApiTest {
     }
 
     private String loginAsAdmin() {
-        return TestAuthClient.login(restTemplate, "admin", "admin123");
+        return TestAuthClient.login(restTemplate, redisTemplate, "admin", "admin123");
     }
 
     @SuppressWarnings("unchecked")

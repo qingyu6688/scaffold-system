@@ -1090,6 +1090,7 @@ button.trace-crumb:hover { color: var(--blue); }
 .settings-was { grid-column: 2; display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-size: 11.5px; color: var(--ink-faint); }
 .settings-was s { color: var(--ink-soft); }
 .settings-undo { border: 0; background: none; padding: 0; color: var(--blue); font: inherit; cursor: pointer; }
+.settings-error { grid-column: 2; font-size: 11.5px; color: var(--red-text); text-align: right; }
 .settings-bar { flex-wrap: wrap; }
 .settings-diff { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; padding: 4px 4px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--plate-line); }
 .settings-diff-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; font-size: 12px; color: var(--plate-soft); }
@@ -1103,6 +1104,7 @@ button.trace-crumb:hover { color: var(--blue); }
   .settings-row { grid-template-columns: 1fr; }
   .settings-control { justify-content: flex-start; }
   .settings-was { grid-column: 1; justify-content: flex-start; }
+  .settings-error { grid-column: 1; text-align: left; }
 }
 .settings-bar:has(.settings-diff) { border-radius: var(--r-xl); white-space: normal; width: min(640px, calc(100vw - 32px)); padding: 12px 10px 8px 18px; }
 

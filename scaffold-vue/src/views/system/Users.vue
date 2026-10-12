@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { pathOf } from '@/composables/auth'
+import { currentUser, pathOf } from '@/composables/auth'
+import { syncSessionRoutes } from '@/router'
 import { Avatar, Field, HoverCard, MultiSelect, Segmented, Select, StatusTag, Switch, Tag, TextInput, type Column } from '@/components/ui'
 import { DeptSelect, DeptTree, DictSelect, FormDialog, ListPage, PermissionButton } from '@/components/business'
 import BoardView, { type BoardColumn } from '@/components/business/BoardView.vue'
@@ -16,6 +17,7 @@ import { email, phone, required, validate } from '@/utils/validate'
 
 const route = useRoute()
 const router = useRouter()
+const pageName = route.name
 /* 权限溯源：跳到角色页的溯源视图并聚焦该用户 */
 const tracePath = computed(() => pathOf('system/role/index'))
 function openTrace(row: UserRow) {
@@ -208,12 +210,17 @@ async function submit() {
     if (form.id) {
       await systemApi.users.update(form.id, payload)
       pushToast('用户信息已更新')
+      // 编辑的是当前登录账号：后端保留会话，这里同步顶栏姓名、权限与菜单
+      if (payload.username === currentUser.value?.username) {
+        await syncSessionRoutes().catch((error: unknown) => toastError(error, '当前账号信息刷新失败，重新登录后生效'))
+      }
     } else {
       await systemApi.users.create({ ...payload, password: form.password })
       pushToast('用户已新增')
     }
     dialog.value = false
-    await list.load()
+    // 本人去掉了自己访问本页的权限时，同步后已离开本页，不再重载列表
+    if (route.name === pageName) await list.load()
   } catch (error) {
     toastError(error, '用户保存失败')
   } finally {

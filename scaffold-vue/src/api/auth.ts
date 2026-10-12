@@ -32,6 +32,34 @@ export interface CurrentUser {
   permissions: string[]
 }
 
+/** 个人中心：登录账号、部门、角色、岗位只读，姓名与联系方式可由本人维护 */
+export interface ProfileLogin {
+  time: string
+  /** 1 成功，0 失败 */
+  status: number
+  msg?: string
+}
+
+export interface Profile {
+  userId: number
+  username: string
+  nickname: string
+  phone?: string | null
+  email?: string | null
+  deptName?: string | null
+  roles: string[]
+  posts: string[]
+  lastLoginTime?: string | null
+  createTime?: string | null
+  recentLogins: ProfileLogin[]
+}
+
+export interface ProfileUpdateRequest {
+  nickname: string
+  phone: string
+  email: string
+}
+
 export interface RouteItem {
   id?: number
   parentId?: number
@@ -56,6 +84,8 @@ export function createAuthApi(client: HttpClient) {
     me: () => client.get<CurrentUser>('/auth/me'),
     routes: () => client.get<RoutesResponse>('/auth/routes'),
     changePassword: (body: ChangePasswordRequest) => client.put<void>('/auth/password', body),
+    profile: () => client.get<Profile>('/profile'),
+    updateProfile: (body: ProfileUpdateRequest) => client.put<Profile>('/profile', body),
     logout: () => client.post<void>('/auth/logout'),
   }
 }

@@ -15,6 +15,8 @@ const props = withDefaults(defineProps<{
   rows?: number
   maxlength?: number
   autocomplete?: string
+  /** 落到内部 input / textarea 上，供外部 <label for> 关联（设置行等不便包一层 label 的版式） */
+  inputId?: string
 }>(), {
   type: 'text',
   rows: 3,
@@ -46,6 +48,7 @@ defineExpose({ focus: () => el.value?.focus() })
     <Icon v-if="icon" :name="icon" :size="15" />
     <textarea
       v-if="multiline"
+      :id="inputId"
       ref="el"
       :value="modelValue ?? ''"
       :placeholder="placeholder"
@@ -58,6 +61,7 @@ defineExpose({ focus: () => el.value?.focus() })
     />
     <input
       v-else
+      :id="inputId"
       ref="el"
       :type="type"
       :value="modelValue ?? ''"

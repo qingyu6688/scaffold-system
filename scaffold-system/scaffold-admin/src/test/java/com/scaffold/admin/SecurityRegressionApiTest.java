@@ -158,6 +158,27 @@ class SecurityRegressionApiTest {
     }
 
     @Test
+    void editingOwnAccountKeepsSessionWhileEditingOthersRevokes() {
+        long role = role("DEPT");
+        long actor = user("self", 2L, role);
+        long peer = user("selfpeer", 2L, null);
+        var actorHeaders = login(actor);
+        var peerHeaders = login(peer);
+
+        assertStatus(call("/users/" + actor, HttpMethod.PUT, Map.of("nickname", "本人改名", "email", "self@example.com"), actorHeaders), 200);
+        var me = exchange("/api/auth/me", HttpMethod.GET, null, actorHeaders);
+        assertStatus(me, 200);
+        assertThat(data(me)).containsEntry("nickname", "本人改名");
+
+        assertStatus(call("/users/" + peer, HttpMethod.PUT, Map.of("nickname", "他人改名"), actorHeaders), 200);
+        assertUnauthorized(peerHeaders);
+
+        // 本人把自己停用仍立即失效：会话校验同时检查账号状态
+        assertStatus(call("/users/" + actor, HttpMethod.PUT, Map.of("status", 0), actorHeaders), 200);
+        assertUnauthorized(actorHeaders);
+    }
+
+    @Test
     void departmentMoveUpdatesAllDescendantsAndRejectsCycles() {
         long first = dept(1L);
         long child = dept(first);

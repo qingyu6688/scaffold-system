@@ -38,6 +38,7 @@
 | --- | --- | --- | --- | --- |
 | 认证与路由 | `scaffold-system/src/main/java/com/scaffold/system/controller/AuthController.java` | 同包域 `service/AuthService.java`、`SystemPermissionResolver.java` | `mapper/AuthMapper.java`；用户、角色、菜单及关联表、登录日志 | 已确认 |
 | 用户、角色、组织、菜单、字典、参数 | `scaffold-system/src/main/java/com/scaffold/system/controller/SystemManagementController.java` | `service/SystemManagementService.java` | `mapper/SystemManagementMapper.java`；各 `sys_*` 管理表 | 已确认 |
+| 个人中心 | `scaffold-system/src/main/java/com/scaffold/system/controller/ProfileController.java` | `service/ProfileService.java` | `mapper/ProfileMapper.java`；`sys_user`（仅本人姓名、电话、邮箱）、角色 / 岗位关联（只读）、`sys_login_log`（本人只读） | 已确认 |
 | 工作台 | `scaffold-system/src/main/java/com/scaffold/system/controller/DashboardController.java` | `service/DashboardService.java` | `mapper/DashboardMapper.java`；用户、角色、两类日志 | 已确认 |
 | 日志查询、导出与清理 | `scaffold-system/src/main/java/com/scaffold/system/controller/MonitorController.java` | `service/SystemManagementService.java` | `mapper/SystemManagementMapper.java`；两类日志 | 已确认 |
 | 日志统计与当日泳道 | 同上 | `service/MonitorStatsService.java` | `mapper/MonitorStatsMapper.java`；两类日志（只读） | 已确认 |
@@ -48,6 +49,7 @@
 | --- | --- | --- | --- | --- |
 | 登录（全幅画布、神经网络背景、时钟、服务健康） | `/login` | `views/Login.vue` + `components/NeuralNet.vue` | `api/auth.ts`、`portal.ts` 的 `health`；认证 | 已确认 |
 | 工作台（主次布局 + 会话首次开场 + 模块网络卡） | `/dashboard` | `views/Dashboard.vue` | `api/portal.ts`；工作台；有日志权限时加载当日泳道 | 已确认 |
+| 个人中心（设置面板版式，静态路由不走菜单授权） | `/profile` | `views/Profile.vue` | `api/auth.ts` 的 `profile / updateProfile`；个人中心 | 已确认 |
 | 用户（列表 / 看板） | `/system/user` | `views/system/Users.vue` | `api/system.ts`；系统管理 | 已确认 |
 | 角色（列表 / 权限矩阵 / 溯源·图谱舞台） | `/system/role` | `views/system/Roles.vue` + `components/business/PermissionTrace.vue` | 同上 + `permissions/graph` | 已确认 |
 | 菜单（表格 / 导航星系·图谱舞台 + 侧栏预览） | `/system/menu` | `views/system/Menus.vue` + `components/business/MenuStarMap.vue` | 同上 | 已确认 |
@@ -78,6 +80,8 @@
 
 **登录与切换账号**：`Login.vue` → `authApi.login` → `AuthController.login` → `AuthService.login` → `AuthMapper` 校验账号、写登录日志 → `JwtService` 生成独立 token、`TokenStore` 写 Redis → `/auth/me` 取角色和权限 → `/auth/routes` 取菜单 → `router/index.ts` 注册页面；退出同步清除会话、菜单、路由和引用缓存，旧请求以会话版本判定是否仍可写回。
 
+**修改个人资料**：顶栏账号菜单或命令面板「个人中心」→ `Profile.vue` → `GET /profile` → `ProfileService.profile` 按当前登录账号查资料、启用角色 / 岗位与最近 6 条登录日志 → 行内编辑姓名、电话、邮箱，改动汇总到底部浮条 → `PUT /profile` → `ProfileMapper.updateProfile` 只更新三个字段与 `update_by/update_time`，不递增 `session_version` → `refreshUser()` 刷新顶栏姓名；操作日志模块为「个人中心」。
+
 **新增用户**：`Users.vue` → `/system/users/options` 取引用选项 → `FormDialog` 校验 → `systemApi.users.create` → `SystemManagementController.createUser` → `SystemManagementService.createUser` → 用户表与角色、岗位关联表 → 列表重载；操作日志由公共切面记录。
 
 **分配权限**：`Roles.vue` → 菜单树与角色菜单接口 → `PermissionTree` 勾选菜单 / 按钮、选择数据范围 → `PUT /system/roles/{id}` → 更新角色及关联表 → 重新登录加载新权限；停用或删除角色不能提供菜单与操作权限。
@@ -99,6 +103,7 @@
 | 健康检查 | `GET /health` | `HealthController` | 已确认 |
 | 验证码 / 登录 / 退出 | `GET /auth/captcha`、`POST /auth/login`、`POST /auth/logout` | `AuthController` | 已确认 |
 | 用户、路由、修改密码 | `GET /auth/me`、`GET /auth/routes`、`PUT /auth/password` | 同上 | 已确认 |
+| 个人中心 | `GET /profile`、`PUT /profile`（仅需登录，只读写本人） | `ProfileController` | 已确认 |
 | 工作台 | `GET /dashboard/summary`（含 `trendPrev`、`dailyOps`；`stats` 含 `menus` 菜单项、`depts` 部门数） | `DashboardController` | 已确认 |
 | 权限溯源图 | `GET /system/permissions/graph` | `SystemManagementController`（`system:role:list`） | 已确认 |
 | 用户 | `GET/POST /system/users`（列表支持 `postId` 岗位过滤）、`PUT/DELETE /system/users/{id}` | `SystemManagementController` | 已确认 |
@@ -130,7 +135,9 @@
 
 | 症状 | 第一现场 | 排查重点 | 来源 |
 | --- | --- | --- | --- |
+| 管理员编辑自己后被踢回登录页 | `SystemManagementService.updateUser`、`SystemManagementMapper.updateUser` | 本人判断是否命中（按登录账号比对）、`sessionBump` 是否为 0；停用自己属预期退出 | 已确认 |
 | 切换账号后停留登录页 / 旧菜单仍可见 | `router/index.ts`、`composables/auth.ts`、`AppShell.vue` | 会话同步清理、旧请求版本、路由初始化取消、失效跳转 | 已确认 |
+| 改了姓名但顶栏仍是旧名 | `Profile.vue`、`composables/auth.ts` | 保存后 `refreshUser()` 是否成功；`/auth/me` 读取的 `sys_user.nickname` | 已确认 |
 | 登录成功但没有菜单 | `AuthService.routes`、`AuthMapper`、`NoAccess.vue` | 角色启用状态、菜单授权、组件是否注册 | 已确认 |
 | 菜单可见但接口返回 403 | `PermissionAspect`、`SystemPermissionResolver` | 当前角色 / 按钮权限、用户状态；引用选项使用专用接口 | 已确认 |
 | 部门筛选漏掉下级 / 数据范围错误 | `SystemManagementMapper`、`SystemDataScopeResolver` | `ancestors`、部门范围、分页和导出是否同口径 | 已确认 |
@@ -191,6 +198,7 @@
 - 用户写入边界：`UserAccessPolicy` → `SystemDataScopeResolver` / `AuthMapper` → `SystemManagementMapper.selectUserForUpdate`，在事务内校验并写入。
 - 有效权限：`SystemPermissionResolver.effectivePermissions` 与 `AuthService.currentUser` 共同限制角色、菜单、部门结构写权限。
 - 会话失效：`sys_user.session_version` → `TokenStore.Session` → `JwtAuthenticationFilter` → `SystemSessionAccountResolver`，每次认证检查账号及版本。
+- 本人编辑自己：`SystemManagementService.updateUser` 比对目标账号与操作人，本人时 `updateUser(..., sessionBump = 0)` 不吊销会话 → `Users.vue` 保存后调用 `router/index.ts` 的 `syncSessionRoutes()` 重新拉取 `/auth/me`、`/auth/routes` 并重建动态路由；回归见 `SecurityRegressionApiTest.editingOwnAccountKeepsSessionWhileEditingOthersRevokes`。
 - 部门移动：`SystemManagementService.updateDept` → `lockDeptTree` → `DepartmentPaths.move` → `updateDeptAncestors`，当前节点和后代同一事务更新。
 - 用户多选：`Users.vue` / `MultiSelect.vue`，列表明确返回部门、角色和岗位编号；关联按两次批量查询补全。
 - 回归入口：`SecurityRegressionApiTest`、`DepartmentPathsTest`、`UserPostPolicyTest`、`ExportSafetyTest`、`LoginGuardTest`、`scripts/session-regression.py`。

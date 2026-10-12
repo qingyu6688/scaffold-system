@@ -13,6 +13,8 @@ const staticRoutes: RouteRecordRaw[] = [
     component: AppShell,
     children: [
       { path: 'no-access', name: 'no-access', component: () => import('@/views/NoAccess.vue'), meta: { title: '暂未分配菜单' } },
+      // 个人中心属于每个已登录账号，不走 sys_menu 授权，未分配菜单的账号也能进入
+      { path: 'profile', name: 'profile', component: () => import('@/views/Profile.vue'), meta: { title: '个人中心' } },
       { path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFound.vue'), meta: { title: '页面不存在' } },
     ],
   },
@@ -63,6 +65,25 @@ async function ensureRoutes() {
       cancelRouteLoad = null
     }
   }
+}
+
+/**
+ * 本人账号在后台被本人修改后调用：不清会话，以服务端为准刷新当前用户、权限与菜单，并重建动态路由。
+ * 角色变化后当前页面若已不在授权范围内，回到新的首页。
+ */
+export async function syncSessionRoutes() {
+  if (!routesReady) {
+    // 路由仍在初始化，守卫完成后自然是最新数据，这里只刷新用户
+    await refreshUser()
+    return
+  }
+  const version = sessionVersion.value
+  await Promise.all([loadRoutes(), refreshUser()])
+  if (version !== sessionVersion.value || !authed.value) return
+  removeRoutes.splice(0).forEach(remove => remove())
+  dynamicRoutes.value.forEach(route => removeRoutes.push(router.addRoute('root', route)))
+  const current = router.currentRoute.value.name
+  if (current && !router.hasRoute(current)) await router.replace(homePath())
 }
 
 router.beforeEach(async (to) => {

@@ -487,9 +487,10 @@ public interface SystemManagementMapper {
     @Options(useGeneratedKeys = true, keyProperty = "row.id")
     int insertUser(@Param("row") Map<String, Object> row, @Param("operator") String operator);
 
+    /** sessionBump：1 使该账号已有会话全部失效，0 保留（本人编辑自己时） */
     @Update("""
             UPDATE sys_user
-            SET session_version = session_version + 1, nickname = COALESCE(#{row.nickname}, nickname),
+            SET session_version = session_version + #{sessionBump}, nickname = COALESCE(#{row.nickname}, nickname),
                 phone = COALESCE(#{row.phone}, phone),
                 email = COALESCE(#{row.email}, email),
                 dept_id = COALESCE(#{row.deptId}, dept_id),
@@ -497,7 +498,8 @@ public interface SystemManagementMapper {
                 update_by = #{operator}
             WHERE id = #{id} AND deleted = 0
             """)
-    int updateUser(@Param("id") Long id, @Param("row") Map<String, Object> row, @Param("operator") String operator);
+    int updateUser(@Param("id") Long id, @Param("row") Map<String, Object> row, @Param("operator") String operator,
+                   @Param("sessionBump") int sessionBump);
 
     @Update("""
             UPDATE sys_user

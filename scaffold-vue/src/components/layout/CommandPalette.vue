@@ -18,7 +18,7 @@ import { hasPermission } from '@/directives/permission'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'action', name: 'appearance' | 'password' | 'logout'): void
+  (e: 'action', name: 'profile' | 'appearance' | 'password' | 'logout'): void
 }>()
 
 const router = useRouter()
@@ -73,6 +73,7 @@ const entries = computed<Entry[]>(() => {
   const actions: Entry[] = [
     { key: 'a-theme', group: '动作', label: dark ? '切换到浅色外观' : '切换到深色外观', icon: dark ? 'sun' : 'moon', run: () => { appearance.theme = dark ? 'light' : 'dark'; emit('close') } },
     { key: 'a-appearance', group: '动作', label: '外观设置', sub: '主题、表格密度', icon: 'sliders', run: () => act('appearance') },
+    { key: 'a-profile', group: '动作', label: '个人中心', sub: '姓名、联系方式、登录记录', icon: 'user', run: () => act('profile') },
     { key: 'a-password', group: '动作', label: '修改密码', icon: 'key', run: () => act('password') },
     { key: 'a-logout', group: '动作', label: '退出登录', icon: 'logout', run: () => act('logout') },
   ]
@@ -148,7 +149,7 @@ function go(path: string, query?: Record<string, string>) {
   emit('close')
   router.push({ path, query })
 }
-function act(name: 'appearance' | 'password' | 'logout') {
+function act(name: 'profile' | 'appearance' | 'password' | 'logout') {
   emit('close')
   emit('action', name)
 }

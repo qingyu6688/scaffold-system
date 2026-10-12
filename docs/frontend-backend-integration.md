@@ -24,6 +24,7 @@
 | 页面 / 公共能力 | API 文件 | 后端路径（均带 /api 前缀） |
 | --- | --- | --- |
 | 登录、当前用户、菜单、密码 | `auth.ts` | `/auth/captcha`、`/auth/login`、`/auth/me`、`/auth/routes`、`/auth/logout`、`/auth/password` |
+| 个人中心 | `auth.ts` 的 `profile / updateProfile` | `GET /profile`、`PUT /profile`（仅需登录） |
 | 用户、角色、菜单、部门、岗位、字典、参数 | `system.ts` | `/system/users`（可选 `postId` 岗位过滤）、`/roles`、`/menus`、`/depts`、`/posts`、`/dict`、`/configs`（后六项也带 /system） |
 | 权限溯源图 | `system.ts` 的 `permissions.graph` | `/system/permissions/graph` |
 | 登录热力 | `system.ts` 的 `loginLogs.heatmap` | `/monitor/login-logs/heatmap` |
@@ -43,7 +44,25 @@
 
 按钮权限与 `@RequiresPermission` 使用同一权限码；数据范围由后端查询 / 导出执行。停用或删除角色不提供权限，前端隐藏操作不能代替后端 403 校验。
 
+用户管理中编辑当前登录账号本人成功后，后端保留会话，前端调用 `syncSessionRoutes()` 按 `/auth/me`、`/auth/routes` 刷新顶栏、权限与菜单；当前页失去授权时回到新的首页。编辑他人、重置密码、停用和删除仍使对方旧会话失效。
+
 退出、401 与新登录共用清理逻辑；旧 token 的 401 不清除新 token，旧菜单 / 用户响应不能写入新会话，初始化中的旧路由会取消。
+
+## 个人中心
+
+`GET /profile` 只返回当前登录账号本人的资料，不要求菜单或按钮权限，未分配菜单的账号同样可用：
+
+| 字段 | 中文含义 |
+| --- | --- |
+| `userId` / `username` | 用户 ID / 登录账号，只读 |
+| `nickname` | 姓名（`sys_user.nickname`），可改 |
+| `phone` / `email` | 手机号码 / 电子邮箱，可改，未填写时为 `null` |
+| `deptName` | 所属部门名称，只读 |
+| `roles` / `posts` | 已启用的角色名称 / 岗位名称，只读 |
+| `lastLoginTime` / `createTime` | 最近登录时间 / 账号创建时间，格式 `yyyy-MM-dd HH:mm` |
+| `recentLogins` | 本账号最近 6 条登录日志：`time` 时间、`status` 1 成功 / 0 失败、`msg` 提示消息 |
+
+`PUT /profile` 只接收 `nickname`（必填，≤64）、`phone`（数字、空格、`+()-`，≤32）、`email`（邮箱格式，≤128），空字符串存为 `null`；请求体中的账号、部门、状态、角色等字段一律忽略。成功返回与 `GET` 相同的结构，并记录「个人中心 / 修改资料」操作日志。资料修改不递增 `session_version`，当前会话继续有效；前端保存后调用 `/auth/me` 刷新顶栏姓名。
 
 ## 引用选项
 

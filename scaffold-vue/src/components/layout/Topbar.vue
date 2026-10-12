@@ -11,6 +11,7 @@ const emit = defineEmits<{
   (e: 'toggle-rail'): void
   (e: 'command'): void
   (e: 'appearance'): void
+  (e: 'profile'): void
   (e: 'password'): void
   (e: 'logout'): void
 }>()
@@ -60,9 +61,10 @@ function onKey(event: KeyboardEvent) {
   }
 }
 
-function pick(action: 'appearance' | 'password' | 'logout') {
+function pick(action: 'profile' | 'appearance' | 'password' | 'logout') {
   closeMenu()
-  if (action === 'appearance') emit('appearance')
+  if (action === 'profile') emit('profile')
+  else if (action === 'appearance') emit('appearance')
   else if (action === 'password') emit('password')
   else emit('logout')
 }
@@ -107,6 +109,7 @@ onBeforeUnmount(() => closeMenu())
             <div style="font-weight: 680">{{ currentUser?.nickname }}</div>
             <div class="soft" style="font-size: 12px">@{{ currentUser?.username }}<template v-if="currentUser?.deptName"> · {{ currentUser.deptName }}</template></div>
           </div>
+          <button type="button" class="menu-item" role="menuitem" @click="pick('profile')"><Icon name="user" :size="16" />个人中心</button>
           <button type="button" class="menu-item" role="menuitem" @click="pick('password')"><Icon name="key" :size="16" />修改密码</button>
           <button type="button" class="menu-item" role="menuitem" @click="pick('appearance')"><Icon name="contrast" :size="16" />外观设置</button>
           <button type="button" class="menu-item is-danger" role="menuitem" @click="pick('logout')"><Icon name="logout" :size="16" />退出登录</button>

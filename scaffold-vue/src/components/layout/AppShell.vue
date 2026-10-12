@@ -49,8 +49,9 @@ async function onLogout() {
   await task
 }
 
-function onCommandAction(name: 'appearance' | 'password' | 'logout') {
-  if (name === 'appearance') appearanceOpen.value = true
+function onCommandAction(name: 'profile' | 'appearance' | 'password' | 'logout') {
+  if (name === 'profile') router.push({ name: 'profile' })
+  else if (name === 'appearance') appearanceOpen.value = true
   else if (name === 'password') passwordOpen.value = true
   else onLogout()
 }
@@ -86,6 +87,7 @@ onBeforeUnmount(() => {
           @toggle-rail="toggleRail"
           @command="commandOpen = true"
           @appearance="appearanceOpen = true"
+          @profile="router.push({ name: 'profile' })"
           @password="passwordOpen = true"
           @logout="onLogout"
         />

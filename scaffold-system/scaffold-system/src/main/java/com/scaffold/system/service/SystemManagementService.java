@@ -398,7 +398,11 @@ public class SystemManagementService {
         row.put("email", request.getEmail());
         row.put("deptId", request.getDeptId());
         row.put("status", request.getStatus());
-        if (mapper.updateUser(id, row, currentUsername()) == 0) {
+        // 本人编辑自己不吊销当前会话：权限与数据范围每次请求实时计算，停用仍由会话校验中的状态拦截；
+        // 编辑他人时照旧递增会话版本，让对方旧令牌失效。
+        String operator = currentUsername();
+        int sessionBump = operator.equals(target.get("username")) ? 0 : 1;
+        if (mapper.updateUser(id, row, operator, sessionBump) == 0) {
             throw new BusinessException("用户不存在或已删除");
         }
         if (request.getRoleIds() != null) {

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `scaffold-common` | 统一响应、分页、业务异常 | `R`、`PageQuery`、`PageResult`、`BusinessException` |
 | `scaffold-framework` | 认证、会话、权限、数据范围、操作审计、异常与请求追踪 | `security`、`datascope`、`audit`、`handler`、`filter` |
-| `scaffold-system` | 用户、角色、组织、菜单、字典、参数、日志与工作台；日志统计与当日泳道 | `AuthController`、`SystemManagementController`、`DashboardController`、`MonitorController`、`MonitorStatsService` |
+| `scaffold-system` | 用户、角色、组织、菜单、字典、参数、日志与工作台；日志统计与当日泳道；个人中心 | `AuthController`、`SystemManagementController`、`DashboardController`、`MonitorController`、`MonitorStatsService`、`ProfileController` |
 | `scaffold-generator` | 真实表导入、生成配置、预览、ZIP 下载 | `GeneratorController`、`GeneratorService`、`GeneratorMapper` |
 | `scaffold-admin` | 启动、配置、初始化工具与集成测试 | `ScaffoldAdminApplication`、`DbInit` |
 
@@ -24,6 +24,7 @@
 - 菜单来自真实授权关系；超级管理员读取所有启用且可见的菜单，无需逐项授权新菜单。
 - `@DataScope`、`SystemDataScopeResolver` 与 `DataScopeCriteria` 当前接入用户查询和导出，新增业务须按业务表字段显式接入。
 - `@OperLog` 统一记录写操作及脱敏请求参数；异常由 `GlobalExceptionHandler` 返回统一错误结构。
+- 个人中心 `ProfileController` → `ProfileService` → `ProfileMapper` 独立成模块，只按当前登录账号读写本人的姓名与联系方式，不走用户管理的权限与数据范围；资料修改不使旧会话失效，改密仍走 `/auth/password`。
 
 ## 初始化与时间
 
